@@ -49,7 +49,7 @@ MainTab:CreateButton({
 -- Auto Ticket Farm
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local FARM_INTERVAL = 1 -- seconds between claims, uncalibrated
+local FARM_INTERVAL = 3 -- seconds between claims, uncalibrated
 local farmToken = 0
 
 MainTab:CreateToggle({
