@@ -46,8 +46,7 @@ MainTab:CreateButton({
     end
 })
 
-
-
+-- Auto Ticket Farm
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local FARM_INTERVAL = 1 -- seconds between claims, uncalibrated
@@ -84,7 +83,7 @@ MainTab:CreateToggle({
     end
 })
 
-
+-- Auto Sell
 local SELL_INTERVAL = 1 -- seconds between sells, uncalibrated
 local SELL_AMOUNT = 300 -- from your Cobalt capture
 local sellToken = 0
@@ -120,9 +119,7 @@ MainTab:CreateToggle({
     end
 })
 
-
-
-
+-- Teleport
 local Players = game:GetService("Players")
 
 local TELEPORT_HEIGHT_OFFSET = 0 -- studs added to Y, my choice; raise it if you clip into the floor
@@ -161,6 +158,250 @@ for _, spot in ipairs(TeleportSpots) do
         end
     })
 end
+
+-- My Home / Global Leaderboard
+local MANUAL_HOME_NAME = nil -- e.g. "Home3"; set this to skip the House attribute
+local TARGET_NAME = "GlobalLeaderboard" -- model name from you
+local TARGET_HEIGHT_OFFSET = 3 -- studs above the model pivot, my choice; uncalibrated
+
+local function getHomesFolder()
+    local map = workspace:FindFirstChild("Map")
+    return map and map:FindFirstChild("Homes")
+end
+
+-- Home number comes from the player attribute "House" (seen in your HomeMarker script)
+local function findMyHome()
+    local homes = getHomesFolder()
+    if not homes then
+        return nil, "Workspace.Map.Homes not found"
+    end
+    if MANUAL_HOME_NAME then
+        return homes:FindFirstChild(MANUAL_HOME_NAME), "manual"
+    end
+    local houseNumber = Players.LocalPlayer:GetAttribute("House")
+    if type(houseNumber) ~= "number" then
+        return nil, "player attribute House is not set (yet)"
+    end
+    local home = homes:FindFirstChild("Home" .. houseNumber)
+    if not home then
+        return nil, "no Home" .. houseNumber .. " folder under Workspace.Map.Homes"
+    end
+    return home, "player attribute House=" .. houseNumber
+end
+
+local function targetPosition(target)
+    if target:IsA("Model") then
+        return target:GetPivot().Position
+    end
+    return target.Position
+end
+
+local function findLeaderboard()
+    local home, how = findMyHome()
+    if home then
+        local inHome = home:FindFirstChild(TARGET_NAME, true)
+        if inHome then
+            return inHome, "inside " .. home.Name
+        end
+    end
+    local homes = getHomesFolder()
+    if homes then
+        local besideHomes = homes:FindFirstChild(TARGET_NAME) -- direct child only
+        if besideHomes then
+            return besideHomes, "direct child of Homes"
+        end
+    end
+    local map = workspace:FindFirstChild("Map")
+    local inMap = map and map:FindFirstChild(TARGET_NAME) -- direct child only
+    if inMap then
+        return inMap, "direct child of Map"
+    end
+    return nil, TARGET_NAME .. " not found (home lookup said: " .. tostring(how) .. ")"
+end
+
+TeleportTab:CreateButton({
+    Name = "Teleport: Global Leaderboard",
+    Callback = function()
+        local target, how = findLeaderboard()
+        if not target then
+            warn("[Leaderboard] " .. tostring(how))
+            return
+        end
+        if not (target:IsA("Model") or target:IsA("BasePart")) then
+            warn("[Leaderboard] " .. target:GetFullName() .. " is a " .. target.ClassName .. ", not a Model or part")
+            return
+        end
+        print("[Leaderboard] " .. target:GetFullName() .. " via " .. how)
+        teleportTo(targetPosition(target) + Vector3.new(0, TARGET_HEIGHT_OFFSET, 0))
+    end
+})
+
+TeleportTab:CreateButton({
+    Name = "Dump My Home",
+    Callback = function()
+        local home, how = findMyHome()
+        if not home then
+            warn("[Dump] " .. tostring(how))
+            return
+        end
+        print("[Dump] " .. home:GetFullName() .. " via " .. how)
+        for k, v in pairs(home:GetAttributes()) do
+            print("  attr " .. k .. " = " .. tostring(v))
+        end
+        for _, d in ipairs(home:GetDescendants()) do
+            print("  " .. d.ClassName .. " " .. d:GetFullName())
+        end
+    end
+})
+
+-- Dump All Homes
+local DUMP_LINE_CAP = 150 -- lines printed per home, my choice
+
+local function describeInteresting(d)
+    if d:IsA("ValueBase") then
+        return d.ClassName .. " " .. d:GetFullName() .. " = " .. tostring(d.Value)
+    end
+    if d:IsA("TextLabel") or d:IsA("TextButton") then
+        return d.ClassName .. " " .. d:GetFullName() .. " text=" .. d.Text
+    end
+    local parts = {}
+    for k, v in pairs(d:GetAttributes()) do
+        parts[#parts + 1] = k .. "=" .. tostring(v)
+    end
+    if #parts > 0 then
+        return d.ClassName .. " " .. d:GetFullName() .. " attrs: " .. table.concat(parts, ", ")
+    end
+    return nil
+end
+
+TeleportTab:CreateButton({
+    Name = "Dump All Homes",
+    Callback = function()
+        local homes = getHomesFolder()
+        if not homes then
+            warn("[DumpAll] Workspace.Map.Homes not found")
+            return
+        end
+        for _, home in ipairs(homes:GetChildren()) do
+            print("[DumpAll] ===== " .. home:GetFullName() .. " =====")
+            local printed = 0
+            local function emit(line)
+                if printed < DUMP_LINE_CAP then
+                    print("  " .. line)
+                    printed += 1
+                end
+            end
+            local own = describeInteresting(home)
+            if own then emit(own) end
+            for _, d in ipairs(home:GetDescendants()) do
+                local line = describeInteresting(d)
+                if line then emit(line) end
+                if d.Name == TARGET_NAME then
+                    emit("TARGET " .. d.ClassName .. " " .. d:GetFullName())
+                end
+            end
+            if printed >= DUMP_LINE_CAP then
+                print("  (capped at " .. DUMP_LINE_CAP .. " lines)")
+            end
+        end
+    end
+})
+
+-- Auto Curfew
+local CURFEW_TELEPORT_MINUTE = 21 * 60 + 31 -- 9:31 PM, minutes after midnight; your time, read as PM
+local CLOCK_POLL = 0.25 -- seconds between clock checks, my choice
+local MAX_CLOCK_JUMP = 10 -- game minutes; a bigger jump (stall, sleep) is ignored, my choice
+local curfewToken = 0
+
+-- Constants copied from the game's clock module you pasted
+local CLOCK_DAY_START = 420
+local CLOCK_SCHOOL_START = 555
+local CLOCK_SCHOOL_END = 945
+local CLOCK_SLOW = 2.5
+local CLOCK_MORNING = CLOCK_SCHOOL_START - CLOCK_DAY_START
+local CLOCK_SCHOOL = (CLOCK_SCHOOL_END - CLOCK_SCHOOL_START) * CLOCK_SLOW
+local CLOCK_EVENING = CLOCK_DAY_START + 1440 - CLOCK_SCHOOL_END
+local CLOCK_DAY_SECONDS = CLOCK_MORNING + CLOCK_SCHOOL + CLOCK_EVENING
+
+-- Returns game minutes after midnight, or nil if ClockStart is not a number
+local function gameMinutes()
+    local start = workspace:GetAttribute("ClockStart")
+    if type(start) ~= "number" then
+        return nil
+    end
+    local seconds = math.max(workspace:GetServerTimeNow() - start, 0) % CLOCK_DAY_SECONDS
+    local minutes
+    if seconds < CLOCK_MORNING then
+        minutes = CLOCK_DAY_START + seconds
+    else
+        local school = seconds - CLOCK_MORNING
+        if school < CLOCK_SCHOOL then
+            minutes = CLOCK_SCHOOL_START + school / CLOCK_SLOW
+        else
+            minutes = CLOCK_SCHOOL_END + (school - CLOCK_SCHOOL)
+        end
+    end
+    return minutes % 1440
+end
+
+local function teleportToLeaderboard()
+    local target, how = findLeaderboard()
+    if not target then
+        warn("[AutoCurfew] " .. tostring(how))
+        return
+    end
+    if not (target:IsA("Model") or target:IsA("BasePart")) then
+        warn("[AutoCurfew] " .. target:GetFullName() .. " is a " .. target.ClassName .. ", not a Model or part")
+        return
+    end
+    print("[AutoCurfew] " .. target:GetFullName() .. " via " .. how)
+    teleportTo(targetPosition(target) + Vector3.new(0, TARGET_HEIGHT_OFFSET, 0))
+end
+
+local AutomaticTab = Window:CreateTab({
+    Name = "Automatic",
+    Icon = "autorenew",
+    ImageSource = "Material",
+    ShowTitle = true
+})
+
+AutomaticTab:CreateToggle({
+    Name = "Auto Curfew",
+    Description = "Teleports to Global Leaderboard at 9:31 PM game time",
+    CurrentValue = false,
+    Flag = "AutoCurfew",
+    Callback = function(Value)
+        curfewToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = curfewToken
+        task.spawn(function()
+            local warnedNoClock = false
+            local previous = gameMinutes()
+            while curfewToken == myToken do
+                task.wait(CLOCK_POLL)
+                local current = gameMinutes()
+                if current == nil then
+                    if not warnedNoClock then
+                        warn("[AutoCurfew] workspace attribute ClockStart is not a number, waiting")
+                        warnedNoClock = true
+                    end
+                elseif previous ~= nil
+                    and previous < CURFEW_TELEPORT_MINUTE
+                    and current >= CURFEW_TELEPORT_MINUTE
+                    and current - previous < MAX_CLOCK_JUMP then
+                    local ok, err = pcall(teleportToLeaderboard)
+                    if not ok then
+                        warn("[AutoCurfew] " .. tostring(err))
+                    end
+                end
+                previous = current
+            end
+        end)
+    end
+})
 
 local ThemeTab = Window:CreateTab({
     Name = "Theme",
