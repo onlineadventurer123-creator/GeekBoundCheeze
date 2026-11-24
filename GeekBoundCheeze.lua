@@ -49,7 +49,7 @@ MainTab:CreateButton({
 -- Auto Ticket Farm
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local FARM_INTERVAL = 3 -- seconds between claims, uncalibrated
+local FARM_INTERVAL = 5 -- seconds between claims, uncalibrated
 local farmToken = 0
 
 MainTab:CreateToggle({
@@ -84,7 +84,7 @@ MainTab:CreateToggle({
 })
 
 -- Auto Sell
-local SELL_INTERVAL = 1 -- seconds between sells, uncalibrated
+local SELL_INTERVAL = 5 -- seconds between sells, uncalibrated
 local SELL_AMOUNT = 300 -- from your Cobalt capture
 local sellToken = 0
 
@@ -127,7 +127,7 @@ local TELEPORT_HEIGHT_OFFSET = 0 -- studs added to Y, my choice; raise it if you
 -- Coordinates from you, as (X, Y, Z)
 local TeleportSpots = {
     { Name = "Bathroom",         Position = Vector3.new(396, 3, -38) },
-    { Name = "Kawaii Deal Man",  Position = Vector3.new(539, -38, 13) },
+    { Name = "Sewer Dealer",  Position = Vector3.new(539, -38, 13) },
     { Name = "Arcade",           Position = Vector3.new(1033, 3, -33) },
 }
 
