@@ -403,7 +403,6 @@ AutomaticTab:CreateToggle({
     end
 })
 
-
 -- Auto Cash Pickup
 local CASH_INTERVAL = 1 -- seconds between sweeps, from you
 local CASH_PROMPT_RANGE = 7 -- MaxActivationDistance in the CashDrops module you pasted
@@ -476,7 +475,6 @@ AutomaticTab:CreateToggle({
         end)
     end
 })
-
 
 -- Force Cash Drops
 local CASH_SPAWN_INTERVAL = 5 -- seconds between spawn attempts, my choice; uncalibrated
@@ -557,7 +555,117 @@ AutomaticTab:CreateToggle({
     end
 })
 
+-- Daily Sales Cap (slider)
+local DAILY_SALES_DEFAULT = 6 -- the module's own value, from your paste
+local salesModule = nil
 
+local function findSalesModule()
+    if typeof(getgc) ~= "function" then
+        return nil, "executor lacks getgc"
+    end
+    for _, t in ipairs(getgc(true)) do
+        if type(t) == "table"
+            and type(rawget(t, "DAILY_SALES")) == "number"
+            and rawget(t, "MEET_SECONDS") ~= nil
+            and type(rawget(t, "sell")) == "function" then
+            return t
+        end
+    end
+    return nil, "sales table not found, the module may not have loaded yet"
+end
+
+local function applyDailySales(value)
+    value = math.floor(tonumber(value) or DAILY_SALES_DEFAULT)
+    if not salesModule then
+        if value == DAILY_SALES_DEFAULT then
+            return -- nothing to change, skip the memory search
+        end
+        local found, why = findSalesModule()
+        if not found then
+            warn("[DailySales] " .. tostring(why))
+            return
+        end
+        salesModule = found
+    end
+    rawset(salesModule, "DAILY_SALES", value)
+    print("[DailySales] cap is now " .. tostring(rawget(salesModule, "DAILY_SALES")))
+end
+
+AutomaticTab:CreateSlider({
+    Name = "Daily Sales Cap",
+    Range = {1, 30},
+    Increment = 1,
+    CurrentValue = DAILY_SALES_DEFAULT,
+    Flag = "DailySalesCap",
+    Callback = function(Value)
+        local ok, err = pcall(applyDailySales, Value)
+        if not ok then
+            warn("[DailySales] " .. tostring(err))
+        end
+    end
+})
+
+-- Device Sale
+local DEVICE_SALE_AMOUNT = 35000 -- from your capture
+local DEVICE_SALE_KIND = "devicesale" -- from your capture
+local DEVICE_SALE_INTERVAL = 5 -- seconds between sales, my choice; uncalibrated
+local DEVICE_REFUSED_WAIT = 60 -- seconds to wait after a false reply, my choice; uncalibrated
+local deviceSaleToken = 0
+
+local function sellDevice()
+    local remotes = ReplicatedStorage:FindFirstChild("MoneyRemotes")
+    local change = remotes and remotes:FindFirstChild("Change")
+    if not change then
+        error("MoneyRemotes.Change not found")
+    end
+    return change:InvokeServer(DEVICE_SALE_AMOUNT, DEVICE_SALE_KIND)
+end
+
+MainTab:CreateButton({
+    Name = "Sell Device",
+    Callback = function()
+        local ok, result = pcall(sellDevice)
+        print("[DeviceSale]", ok, typeof(result), tostring(result))
+    end
+})
+
+AutomaticTab:CreateToggle({
+    Name = "Auto Device Sale",
+    Description = "Sells every interval, backs off when the server refuses",
+    CurrentValue = false,
+    Flag = "AutoDeviceSale",
+    Callback = function(Value)
+        deviceSaleToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = deviceSaleToken
+        task.spawn(function()
+            local sold = 0
+            while deviceSaleToken == myToken do
+                local ok, result = pcall(sellDevice)
+                local waitFor = DEVICE_SALE_INTERVAL
+                if not ok then
+                    warn("[AutoDeviceSale] " .. tostring(result))
+                elseif result == false then
+                    print("[AutoDeviceSale] refused after " .. sold .. " accepted calls, waiting " .. DEVICE_REFUSED_WAIT .. "s")
+                    sold = 0
+                    waitFor = DEVICE_REFUSED_WAIT
+                else
+                    sold += 1
+                    if sold == 1 then
+                        print("[AutoDeviceSale] first reply: " .. tostring(result))
+                    end
+                end
+                local deadline = os.clock() + waitFor
+                while deviceSaleToken == myToken and os.clock() < deadline do
+                    task.wait(0.25)
+                end
+            end
+        end)
+    end
+})
 
 local ThemeTab = Window:CreateTab({
     Name = "Theme",
