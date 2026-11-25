@@ -605,6 +605,21 @@ AutomaticTab:CreateSlider({
     end
 })
 
+AutomaticTab:CreateButton({
+    Name = "Set Daily Sales 30",
+    Callback = function()
+        local found, why = findSalesModule()
+        if not found then
+            warn("[DailySales] " .. tostring(why))
+            return
+        end
+        salesModule = found
+        rawset(found, "DAILY_SALES", 30)
+        print("[DailySales] button set cap to " .. tostring(rawget(found, "DAILY_SALES")))
+    end
+})
+
+
 -- Device Sale
 local DEVICE_SALE_AMOUNT = 35000 -- from your capture
 local DEVICE_SALE_KIND = "devicesale" -- from your capture
