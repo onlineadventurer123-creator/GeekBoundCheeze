@@ -403,6 +403,162 @@ AutomaticTab:CreateToggle({
     end
 })
 
+
+-- Auto Cash Pickup
+local CASH_INTERVAL = 1 -- seconds between sweeps, from you
+local CASH_PROMPT_RANGE = 7 -- MaxActivationDistance in the CashDrops module you pasted
+local CASH_STAND_OFFSET = Vector3.new(0, 3, 0) -- where I stand relative to the drop, my choice
+local cashToken = 0
+
+local function collectCash(drop)
+    local prompt = drop:FindFirstChildOfClass("ProximityPrompt")
+    if not prompt or not prompt.Enabled then
+        return
+    end
+    if typeof(fireproximityprompt) == "function" then
+        fireproximityprompt(prompt)
+    else
+        prompt:InputHoldBegin()
+        task.wait(0.05)
+        prompt:InputHoldEnd()
+    end
+end
+
+local function sweepCash(myToken)
+    local folder = workspace:FindFirstChild("CashDrops")
+    local character = Players.LocalPlayer.Character
+    local root = character and character:FindFirstChild("HumanoidRootPart")
+    if not folder or not root then
+        return
+    end
+
+    local origin
+    for _, drop in ipairs(folder:GetChildren()) do
+        if cashToken ~= myToken then
+            break
+        end
+        if drop:IsA("BasePart") and drop.Name == "Cash" and drop.Parent then
+            if (root.Position - drop.Position).Magnitude > CASH_PROMPT_RANGE - 1 then
+                origin = origin or character:GetPivot()
+                character:PivotTo(CFrame.new(drop.Position + CASH_STAND_OFFSET))
+                root.AssemblyLinearVelocity = Vector3.zero
+                task.wait(0.1)
+            end
+            collectCash(drop)
+        end
+    end
+    if origin then
+        character:PivotTo(origin)
+        root.AssemblyLinearVelocity = Vector3.zero
+    end
+end
+
+AutomaticTab:CreateToggle({
+    Name = "Auto Cash Pickup",
+    Description = "Grabs every dropped cash pile each second",
+    CurrentValue = false,
+    Flag = "AutoCashPickup",
+    Callback = function(Value)
+        cashToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = cashToken
+        task.spawn(function()
+            while cashToken == myToken do
+                local ok, err = pcall(sweepCash, myToken)
+                if not ok then
+                    warn("[AutoCash] " .. tostring(err))
+                end
+                task.wait(CASH_INTERVAL)
+            end
+        end)
+    end
+})
+
+
+-- Force Cash Drops
+local CASH_SPAWN_INTERVAL = 5 -- seconds between spawn attempts, my choice; uncalibrated
+local CASH_MAX_LIVE = 3 -- same cap as the module's own 3-drop limit; raise to test, my choice
+local cashSpawnToken = 0
+local spawnNearFn = nil
+
+-- Finds the module's spawnNear by name, then confirms it by its CashDrops folder upvalue
+local function findSpawnNear()
+    if typeof(getgc) ~= "function" or not (debug and debug.getupvalues) then
+        return nil, "executor lacks getgc or debug.getupvalues"
+    end
+    for _, f in ipairs(getgc()) do
+        if type(f) == "function" and debug.info(f, "n") == "spawnNear" then
+            local okUp, ups = pcall(debug.getupvalues, f)
+            if okUp then
+                for _, up in pairs(ups) do
+                    if typeof(up) == "Instance" and up.Name == "CashDrops" then
+                        return f
+                    end
+                end
+            end
+        end
+    end
+    return nil, "spawnNear not found, the module may not have started yet"
+end
+
+local function liveCashCount()
+    local folder = workspace:FindFirstChild("CashDrops")
+    if not folder then
+        return 0
+    end
+    local n = 0
+    for _, c in ipairs(folder:GetChildren()) do
+        if c.Name == "Cash" then
+            n += 1
+        end
+    end
+    return n
+end
+
+AutomaticTab:CreateToggle({
+    Name = "Force Cash Drops",
+    Description = "Spawns cash drops on demand instead of waiting 90-150 seconds",
+    CurrentValue = false,
+    Flag = "ForceCashDrops",
+    Callback = function(Value)
+        cashSpawnToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = cashSpawnToken
+        task.spawn(function()
+            local lastErr
+            while cashSpawnToken == myToken do
+                local ok, err = pcall(function()
+                    if not spawnNearFn then
+                        local f, why = findSpawnNear()
+                        if not f then
+                            error(why)
+                        end
+                        spawnNearFn = f
+                    end
+                    local character = Players.LocalPlayer.Character
+                    local root = character and character:FindFirstChild("HumanoidRootPart")
+                    if root and liveCashCount() < CASH_MAX_LIVE then
+                        spawnNearFn(root.Position)
+                    end
+                end)
+                if not ok and tostring(err) ~= lastErr then
+                    lastErr = tostring(err)
+                    warn("[ForceCash] " .. lastErr)
+                end
+                task.wait(CASH_SPAWN_INTERVAL)
+            end
+        end)
+    end
+})
+
+
+
 local ThemeTab = Window:CreateTab({
     Name = "Theme",
     Icon = "palette",
