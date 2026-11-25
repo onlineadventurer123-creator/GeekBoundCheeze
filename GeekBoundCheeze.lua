@@ -667,6 +667,70 @@ AutomaticTab:CreateToggle({
     end
 })
 
+-- No Shift Cooldown
+local SHIFT_CD_POLL = 0.5 -- seconds between resets, my choice
+local shiftCdToken = 0
+local dinerRecords = {}
+
+-- Diner records from the shift module you pasted: cooldownUntil number, prompts table, model Instance
+local function findDinerRecords()
+    if typeof(getgc) ~= "function" then
+        return nil, "executor lacks getgc"
+    end
+    local found = {}
+    for _, t in ipairs(getgc(true)) do
+        if type(t) == "table"
+            and type(rawget(t, "cooldownUntil")) == "number"
+            and type(rawget(t, "prompts")) == "table"
+            and typeof(rawget(t, "model")) == "Instance" then
+            found[#found + 1] = t
+        end
+    end
+    if #found == 0 then
+        return nil, "no diner records found, the shift module may not have started yet"
+    end
+    return found
+end
+
+AutomaticTab:CreateToggle({
+    Name = "No Shift Cooldown",
+    Description = "Resets every diner's client-side shift cooldown",
+    CurrentValue = false,
+    Flag = "NoShiftCooldown",
+    Callback = function(Value)
+        shiftCdToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = shiftCdToken
+        task.spawn(function()
+            local lastErr
+            while shiftCdToken == myToken do
+                local ok, err = pcall(function()
+                    if #dinerRecords == 0 then
+                        local found, why = findDinerRecords()
+                        if not found then
+                            error(why)
+                        end
+                        dinerRecords = found
+                        print("[ShiftCD] found " .. #found .. " diner records")
+                    end
+                    for _, rec in ipairs(dinerRecords) do
+                        rawset(rec, "cooldownUntil", 0)
+                    end
+                end)
+                if not ok and tostring(err) ~= lastErr then
+                    lastErr = tostring(err)
+                    warn("[ShiftCD] " .. lastErr)
+                end
+                task.wait(SHIFT_CD_POLL)
+            end
+        end)
+    end
+})
+
+
 local ThemeTab = Window:CreateTab({
     Name = "Theme",
     Icon = "palette",
