@@ -745,6 +745,64 @@ AutomaticTab:CreateToggle({
     end
 })
 
+-- Auto Shift (server cooldown ~22s, measured with the ShiftProbe)
+local SHIFT_ARG = 100
+local SHIFT_KIND = "shift"
+local SHIFT_PAID_WAIT = 23   -- seconds after a payout, a little over the measured 22.4, my choice
+local SHIFT_RETRY_WAIT = 2   -- seconds between tries after a refusal, my choice
+local SHIFT_LONG_REFUSAL = 120 -- seconds of nonstop refusals before assuming a longer limit, my choice
+local shiftToken = 0
+
+AutomaticTab:CreateToggle({
+    Name = "Auto Shift",
+    Description = "Claims shift pay every ~23s, retries while the server cooldown runs",
+    CurrentValue = false,
+    Flag = "AutoShift",
+    Callback = function(Value)
+        shiftToken += 1
+        if not Value then
+            return
+        end
+
+        local myToken = shiftToken
+        task.spawn(function()
+            local paid = 0
+            local refusedSince = nil
+            while shiftToken == myToken do
+                local ok, result = pcall(function()
+                    local remotes = ReplicatedStorage:FindFirstChild("MoneyRemotes")
+                    local change = remotes and remotes:FindFirstChild("Change")
+                    if not change then
+                        error("MoneyRemotes.Change not found")
+                    end
+                    return change:InvokeServer(SHIFT_ARG, SHIFT_KIND)
+                end)
+
+                local waitFor = SHIFT_RETRY_WAIT
+                if not ok then
+                    warn("[AutoShift] " .. tostring(result))
+                elseif result == false then
+                    refusedSince = refusedSince or os.clock()
+                    if os.clock() - refusedSince > SHIFT_LONG_REFUSAL then
+                        warn("[AutoShift] refused for over " .. SHIFT_LONG_REFUSAL .. "s, maybe a daily earning limit, backing off to 30s tries")
+                        waitFor = 30
+                    end
+                else
+                    paid += 1
+                    refusedSince = nil
+                    waitFor = SHIFT_PAID_WAIT
+                    print("[AutoShift] paid call #" .. paid)
+                end
+
+                local deadline = os.clock() + waitFor
+                while shiftToken == myToken and os.clock() < deadline do
+                    task.wait(0.25)
+                end
+            end
+        end)
+    end
+})
+
 
 local ThemeTab = Window:CreateTab({
     Name = "Theme",
