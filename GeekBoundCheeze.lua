@@ -138,7 +138,7 @@ local function stopNoclip()
     table.clear(noclipParts)
 end
 
-AutomaticTab:CreateToggle({
+MainTab:CreateToggle({
     Name = "Noclip",
     Description = "Walk through walls and objects",
     CurrentValue = false,
