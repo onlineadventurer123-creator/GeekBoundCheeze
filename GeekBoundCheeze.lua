@@ -122,6 +122,7 @@ MainTab:CreateToggle({
 
 -- Noclip from larpermax
 local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
 local Plr = Players.LocalPlayer
 local Clipon = false
 local Stepped
