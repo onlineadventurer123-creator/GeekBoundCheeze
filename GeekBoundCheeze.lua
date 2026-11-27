@@ -119,6 +119,55 @@ MainTab:CreateToggle({
     end
 })
 
+
+-- Noclip
+local RunService = game:GetService("RunService")
+local noclipConn = nil
+local noclipParts = {}
+
+local function stopNoclip()
+    if noclipConn then
+        noclipConn:Disconnect()
+        noclipConn = nil
+    end
+    for part in pairs(noclipParts) do
+        if part.Parent then
+            part.CanCollide = true
+        end
+    end
+    table.clear(noclipParts)
+end
+
+AutomaticTab:CreateToggle({
+    Name = "Noclip",
+    Description = "Walk through walls and objects",
+    CurrentValue = false,
+    Flag = "Noclip",
+    Callback = function(Value)
+        stopNoclip()
+        if not Value then
+            return
+        end
+        noclipConn = RunService.Stepped:Connect(function()
+            local character = Players.LocalPlayer.Character
+            if not character then
+                return
+            end
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") and part.CanCollide then
+                    noclipParts[part] = true
+                    part.CanCollide = false
+                end
+            end
+        end)
+    end
+})
+
+
+
+---------------------------------------------------- teleport section ---------------------------------------------------------------------------------
+
+
 -- Teleport
 local Players = game:GetService("Players")
 
@@ -306,6 +355,8 @@ TeleportTab:CreateButton({
         end
     end
 })
+
+-------------------------------------------------------------- Automatic Section ---------------------------------------------------------------------------
 
 -- Auto Curfew
 local CURFEW_TELEPORT_MINUTE = 21 * 60 + 31 -- 9:31 PM, minutes after midnight; your time, read as PM
@@ -802,43 +853,6 @@ AutomaticTab:CreateToggle({
         end)
     end
 })
-
-
-local Workspace = game:GetService("Workspace")
-local CoreGui = game:GetService("CoreGui")
-local Players = game:GetService("Players")
-local Noclip = Instance.new("ScreenGui")
-local BG = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local Toggle = Instance.new("TextButton")
-local StatusPF = Instance.new("TextLabel")
-local Status = Instance.new("TextLabel")
-local Plr = Players.LocalPlayer
-local Clipon = false
-
-AutomaticTab:CreateToggle({
-    Name = "Auto Shift",
-    Description = "Claims shift pay every ~23s, retries while the server cooldown runs",
-    CurrentValue = false,
-    Flag = "AutoShift",
-
-Toggle.MouseButton1Click:connect(function()
-    if Status.Text == "off" then
-        Clipon = true
-        Stepped = game:GetService("RunService").Stepped:Connect(function()
-            if not Clipon == false then
-                for a, b in pairs(Workspace:GetChildren()) do
-                if b.Name == Plr.Name then
-                for i, v in pairs(Workspace[Plr.Name]:GetChildren()) do
-                if v:IsA("BasePart") then
-                v.CanCollide = false
-                end end end end
-            else
-                Stepped:Disconnect()
-            end
-        end)
-    end
-end)
 
 
 local ThemeTab = Window:CreateTab({
