@@ -121,21 +121,15 @@ MainTab:CreateToggle({
 
 
 -- Noclip
+-- Noclip (same logic as your original: direct children, set every frame)
 local RunService = game:GetService("RunService")
 local noclipConn = nil
-local noclipParts = {}
 
 local function stopNoclip()
     if noclipConn then
         noclipConn:Disconnect()
         noclipConn = nil
     end
-    for part in pairs(noclipParts) do
-        if part.Parent then
-            part.CanCollide = true
-        end
-    end
-    table.clear(noclipParts)
 end
 
 MainTab:CreateToggle({
@@ -153,16 +147,14 @@ MainTab:CreateToggle({
             if not character then
                 return
             end
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") and part.CanCollide then
-                    noclipParts[part] = true
-                    part.CanCollide = false
+            for _, v in pairs(character:GetChildren()) do
+                if v:IsA("BasePart") then
+                    v.CanCollide = false
                 end
             end
         end)
     end
 })
-
 
 
 ---------------------------------------------------- teleport section ---------------------------------------------------------------------------------
