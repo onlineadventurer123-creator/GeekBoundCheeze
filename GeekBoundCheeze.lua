@@ -119,7 +119,8 @@ MainTab:CreateToggle({
     end
 })
 
--- Noclip (your pasted logic, no GUI of its own; switched by the Luna toggle)
+
+-- Noclip from larpermax
 local Workspace = game:GetService("Workspace")
 local Plr = Players.LocalPlayer
 local Clipon = false
@@ -843,6 +844,7 @@ AutomaticTab:CreateToggle({
         end)
     end
 })
+
 
 
 local ThemeTab = Window:CreateTab({
