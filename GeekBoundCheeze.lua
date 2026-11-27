@@ -2,6 +2,7 @@ local Luna = loadstring(game:HttpGet(
     "https://raw.githubusercontent.com/Nebula-Softworks/Luna-Interface-Suite/refs/heads/master/source.lua",
     true
 ))()
+print("[Hub] Luna loaded:", typeof(Luna))
 
 local Window = Luna:CreateWindow({
     Name = "GeekBound",
@@ -19,6 +20,7 @@ local Window = Luna:CreateWindow({
 
     KeySystem = false
 })
+print("[Hub] window created:", typeof(Window))
 
 Window:CreateHomeTab({
     SupportedExecutors = {},
@@ -116,8 +118,9 @@ MainTab:CreateToggle({
                 task.wait(SELL_INTERVAL)
             end
         end)
-  end    
+    end
 })
+
 ---------------------------------------------------- teleport section ---------------------------------------------------------------------------------
 
 
@@ -826,3 +829,45 @@ local SettingsTab = Window:CreateTab({
 })
 
 SettingsTab:BuildConfigSection()
+
+-- Noclip (built last and wrapped, so an error here can never stop the other tabs)
+local noclipOk, noclipErr = pcall(function()
+    local Workspace = game:GetService("Workspace")
+    local Plr = game:GetService("Players").LocalPlayer
+    local Stepped
+
+    MainTab:CreateToggle({
+        Name = "Noclip",
+        Description = "Walk through walls and objects",
+        CurrentValue = false,
+        Flag = "Noclip",
+        Callback = function(Value)
+            if Stepped then
+                Stepped:Disconnect()
+                Stepped = nil
+            end
+            if not Value then
+                return
+            end
+            Stepped = game:GetService("RunService").Stepped:Connect(function()
+                for _, b in pairs(Workspace:GetChildren()) do
+                    if b.Name == Plr.Name then
+                        for _, v in pairs(b:GetChildren()) do
+                            if v:IsA("BasePart") then
+                                v.CanCollide = false
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    })
+end)
+
+if noclipOk then
+    print("[Noclip] toggle built")
+else
+    warn("[Noclip] failed to build: " .. tostring(noclipErr))
+end
+
+print("[Hub] reached the end")
