@@ -119,18 +119,11 @@ MainTab:CreateToggle({
     end
 })
 
-
--- Noclip
--- Noclip (same logic as your original: direct children, set every frame)
-local RunService = game:GetService("RunService")
-local noclipConn = nil
-
-local function stopNoclip()
-    if noclipConn then
-        noclipConn:Disconnect()
-        noclipConn = nil
-    end
-end
+-- Noclip (your pasted logic, no GUI of its own; switched by the Luna toggle)
+local Workspace = game:GetService("Workspace")
+local Plr = Players.LocalPlayer
+local Clipon = false
+local Stepped
 
 MainTab:CreateToggle({
     Name = "Noclip",
@@ -138,21 +131,26 @@ MainTab:CreateToggle({
     CurrentValue = false,
     Flag = "Noclip",
     Callback = function(Value)
-        stopNoclip()
-        if not Value then
-            return
-        end
-        noclipConn = RunService.Stepped:Connect(function()
-            local character = Players.LocalPlayer.Character
-            if not character then
-                return
-            end
-            for _, v in pairs(character:GetChildren()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = false
+        if Value then
+            Clipon = true
+            Stepped = game:GetService("RunService").Stepped:Connect(function()
+                if not Clipon == false then
+                    for a, b in pairs(Workspace:GetChildren()) do
+                        if b.Name == Plr.Name then
+                            for i, v in pairs(Workspace[Plr.Name]:GetChildren()) do
+                                if v:IsA("BasePart") then
+                                    v.CanCollide = false
+                                end
+                            end
+                        end
+                    end
+                else
+                    Stepped:Disconnect()
                 end
-            end
-        end)
+            end)
+        else
+            Clipon = false
+        end
     end
 })
 
