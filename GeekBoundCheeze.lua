@@ -115,48 +115,9 @@ MainTab:CreateToggle({
                 end
                 task.wait(SELL_INTERVAL)
             end
-        end)
-    end
-})
-
-
--- Noclip from larpermax
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local Plr = Players.LocalPlayer
-local Clipon = false
-local Stepped
-
-MainTab:CreateToggle({
-    Name = "Noclip",
-    Description = "Walk through walls and objects",
-    CurrentValue = false,
-    Flag = "Noclip",
-    Callback = function(Value)
-        if Value then
-            Clipon = true
-            Stepped = game:GetService("RunService").Stepped:Connect(function()
-                if not Clipon == false then
-                    for a, b in pairs(Workspace:GetChildren()) do
-                        if b.Name == Plr.Name then
-                            for i, v in pairs(Workspace[Plr.Name]:GetChildren()) do
-                                if v:IsA("BasePart") then
-                                    v.CanCollide = false
-                                end
-                            end
-                        end
-                    end
-                else
-                    Stepped:Disconnect()
-                end
-            end)
-        else
-            Clipon = false
         end
-    end
+  end    
 })
-
-
 ---------------------------------------------------- teleport section ---------------------------------------------------------------------------------
 
 
